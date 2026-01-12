@@ -1,6 +1,8 @@
 .DS_Store
 node_modules/
 *.root
+playground/hist/**
+!playground/hist/**/.gitkeep
 dist/
 build/
 *.log

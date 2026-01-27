@@ -206,6 +206,70 @@ void GEnRPAnalysis( Int_t run_no = 9000 ) {
   TH1D* hpolp_sclnp     = new TH1D("hpolp_sclnp","",100,0, 0.003);
   TH2D* hpolp_zclnp     = new TH2D("hpolp_zclnp","",50, 4.50, 4.95,50,0,25);
 
+
+  //-----------------------------------------------------------------------------------------------------------------------------
+
+  TTree *Tout = new TTree("Tout","GEnRPAnalysis outputs");
+
+  // always-available identifiers
+  Long64_t out_ev = 0;
+
+  // ---- flags (0/1) ----
+  int f_basic = 0;       // passed your very first basic event selection (before elastic cuts)
+  int f_elastic = 0;     // passed your W2 + PS cuts
+  int f_has_anatrk = 0;  // you computed ana_x/ana_y and deltas (requires SBSGEMR)
+  int f_has_np = 0;      // you computed thsc/phsc/sclose/zclose/conetestnp in the np block
+  int f_has_p  = 0;      // you computed the "p" block quantities (SBSGEMF && SBSGEMR && GEMdxP)
+
+  // ---- values (sentinel when flag=0) ----
+
+  double v_heli = D_SENT;
+
+  double v_delta_x = D_SENT;
+  double v_delta_y = D_SENT;
+
+  double v_ana_x = D_SENT;
+  double v_ana_y = D_SENT;
+  double v_delta_anax = D_SENT;
+  double v_delta_anay = D_SENT;
+
+  double v_thsc = D_SENT;
+  double v_phsc = D_SENT;
+  double v_sclose = D_SENT;
+  double v_zclose = D_SENT;
+  int    v_conetestnp = I_SENT;
+
+  int    v_CeF_track = I_SENT;
+  int    v_CeR_track = I_SENT;
+
+  // Branches
+  Tout->Branch("ev", &out_ev, "ev/L");
+
+  Tout->Branch("heli", &v_heli, "heli/D");
+
+  Tout->Branch("f_basic", &f_basic, "f_basic/I");
+  Tout->Branch("f_elastic", &f_elastic, "f_elastic/I");
+  Tout->Branch("f_has_anatrk", &f_has_anatrk, "f_has_anatrk/I");
+  Tout->Branch("f_has_np", &f_has_np, "f_has_np/I");
+  Tout->Branch("f_has_p", &f_has_p, "f_has_p/I");
+
+  Tout->Branch("delta_x", &v_delta_x, "delta_x/D");
+  Tout->Branch("delta_y", &v_delta_y, "delta_y/D");
+
+  Tout->Branch("ana_x", &v_ana_x, "ana_x/D");
+  Tout->Branch("ana_y", &v_ana_y, "ana_y/D");
+  Tout->Branch("delta_anax", &v_delta_anax, "delta_anax/D");
+  Tout->Branch("delta_anay", &v_delta_anay, "delta_anay/D");
+
+  Tout->Branch("thsc", &v_thsc, "thsc/D");
+  Tout->Branch("phsc", &v_phsc, "phsc/D");
+  Tout->Branch("sclose", &v_sclose, "sclose/D");
+  Tout->Branch("zclose", &v_zclose, "zclose/D");
+  Tout->Branch("conetestnp", &v_conetestnp, "conetestnp/I");
+
+  Tout->Branch("CeF_track", &v_CeF_track, "CeF_track/I");
+  Tout->Branch("CeR_track", &v_CeR_track, "CeR_track/I");
+
   //-----------------------------------------------------------------------------------------------------------------------------
 
   Double_t hcal_dist    = 9.0;    
@@ -235,7 +299,32 @@ void GEnRPAnalysis( Int_t run_no = 9000 ) {
   Long64_t ev = 0;
 
   while( Tl.Next() ) {
-    std::cout << "Processing event #: " << ev++ << "\r";
+
+    out_ev = ev;
+
+    // reset flags
+    f_basic = 0;
+    f_elastic = 0;
+    f_has_anatrk = 0;
+    f_has_np = 0;
+    f_has_p  = 0;
+
+    // reset values
+    v_delta_x = D_SENT;
+    v_delta_y = D_SENT;
+
+    v_ana_x = D_SENT;
+    v_ana_y = D_SENT;
+    v_delta_anax = D_SENT;
+    v_delta_anay = D_SENT;
+
+    v_thsc = D_SENT;
+    v_phsc = D_SENT;
+    v_sclose = D_SENT;
+    v_zclose = D_SENT;
+    v_conetestnp = I_SENT;
+
+
     if( *bb_tr_n <= 0 ) continue; 
     if( *bb_ps_e < 0.05 ) continue;
     if( fabs(*sbs_hcal_atimeblk-*bb_sh_atimeblk-42) > 5 ) continue;
@@ -320,6 +409,10 @@ void GEnRPAnalysis( Int_t run_no = 9000 ) {
     if( *sbs_gemCeR_track_ntrack > 0 )
       SBSGEMR = true;
     
+    // set flags and values - CeF and CeR tracks
+    v_CeF_track = SBSGEMF ? 1 : 0;
+    v_CeR_track = SBSGEMR ? 1 : 0;
+
     if ( SBSGEMR ) {
 
       ana_x = *sbs_gemCeR_track_x + (polana_dist - polfgem_dist)*(*sbs_gemCeR_track_xp); 
@@ -328,6 +421,14 @@ void GEnRPAnalysis( Int_t run_no = 9000 ) {
       Double_t delta_anax = ana_x - pred_anax;
       Double_t delta_anay = ana_y - pred_anay;
       
+      // set flags and values - ana variables 
+      f_has_anatrk = 1;
+      v_ana_x = ana_x;
+      v_ana_y = ana_y;
+      v_delta_anax = delta_anax;
+      v_delta_anay = delta_anay;
+
+
       hpolana_deltaxc->Fill(delta_anax);
       hpolana_deltayc->Fill(delta_anay);
       hpolana_deltaxyc->Fill(delta_anay,delta_anax);
@@ -355,6 +456,9 @@ void GEnRPAnalysis( Int_t run_no = 9000 ) {
     if( run_no >= 4000 ) 
       helicity = -1 * helicity;
     
+    // set parameter - helicity
+    v_heli = helicity;
+
     if( SBSGEMR && GEMdx && HCALn && !SBSGEMF ) {
       front_vtx = vertex_SBS;
       ana_vtx.SetXYZ( ana_x, ana_y, polana_dist ) ; 
@@ -408,6 +512,15 @@ void GEnRPAnalysis( Int_t run_no = 9000 ) {
   	  }
   	}
       }
+
+    // set flags and values - np block
+    f_has_np = 1;
+    v_thsc = thsc;
+    v_phsc = phsc;
+    v_sclose = sclose;
+    v_zclose = zclose;
+    v_conetestnp = conetestnp ? 1 : 0;
+
     }
 
     if( SBSGEMF && SBSGEMR && GEMdxP ) {
@@ -423,7 +536,9 @@ void GEnRPAnalysis( Int_t run_no = 9000 ) {
     	  hpolp_phnp_cxp->Fill ( 57.3*(*sbs_gemCeR_track_phi) );
       }
     }
-    
+
+    // Fill parameters for polarization transfer analysis
+    Tout->Fill();
     ev++;
   }
   
